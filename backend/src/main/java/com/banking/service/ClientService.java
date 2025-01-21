@@ -18,10 +18,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import com.banking.specification.ClientSpecifications;
 import com.banking.util.PageRequestBuilder;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.IncorrectResultSizeDataAccessException;
 
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 @Service
 @Transactional
@@ -29,10 +32,15 @@ import java.time.LocalDate;
 public class ClientService {
     private final ClientRepository clientRepository;
     private final ClientMapper clientMapper;
+    private final FileStorageService fileStorageService;  
 
-    public ClientService(ClientRepository clientRepository, ClientMapper clientMapper) {
+    public ClientService(
+            ClientRepository clientRepository, 
+            ClientMapper clientMapper,
+            FileStorageService fileStorageService) {    
         this.clientRepository = clientRepository;
         this.clientMapper = clientMapper;
+        this.fileStorageService = fileStorageService;  
     }
 
     @Transactional(readOnly = true)
@@ -78,13 +86,50 @@ public class ClientService {
     public ClientResponseDto save(ClientRequestDto requestDto) {
         log.debug("Saving new client: {}", requestDto);
         try {
+            log.error("Saving new clidsffffffffffffent: {}",requestDto);
+
+            // Validate input first
+            if (requestDto == null) {
+                throw new IllegalArgumentException("Client request cannot be null");
+            }
+
+
+            // Validate email and phone
+            validateEmailAndPhone(requestDto.getEmail(), requestDto.getPhone());
+
             Client client = clientMapper.toEntity(requestDto);
-            validateNewClient(client);
+            validateClient(client);
             Client savedClient = clientRepository.save(client);
             return clientMapper.toResponseDto(savedClient);
+        } catch (IncorrectResultSizeDataAccessException e) {
+            log.error("Duplicate entry detected", e);
+            throw new DuplicateResourceException("An account with this email already exists");
+        } catch (DataIntegrityViolationException e) {
+            log.error("Database constraint violation", e);
+            throw new DuplicateResourceException("A client with these details already exists");
         } catch (Exception e) {
-            log.error("Error while saving client", e);
-            throw new ServiceException("Error while saving client", e);
+            log.error("Error while saving client: {}", e.getMessage(), e);
+            throw new ServiceException("Error while saving client: " + e.getMessage());
+        }
+    }
+
+    private void validateEmailAndPhone(String email, String phone) {
+        // Check email
+        try {
+            if (clientRepository.findByEmail(email).isPresent()) {
+                throw new DuplicateResourceException("Email " + email + " is already registered");
+            }
+        } catch (IncorrectResultSizeDataAccessException e) {
+            throw new DuplicateResourceException("Multiple accounts found with email " + email);
+        }
+
+        // Check phone
+        try {
+            if (clientRepository.findByPhone(phone).isPresent()) {
+                throw new DuplicateResourceException("Phone number " + phone + " is already registered");
+            }
+        } catch (IncorrectResultSizeDataAccessException e) {
+            throw new DuplicateResourceException("Multiple accounts found with phone " + phone);
         }
     }
 
@@ -92,19 +137,50 @@ public class ClientService {
     public ClientResponseDto update(Long id, ClientRequestDto requestDto) {
         log.debug("Updating client with id: {}", id);
         try {
-            if (!clientRepository.existsById(id)) {
-                throw new ResourceNotFoundException("Client" + "id" +id);
-            }
+            Client existingClient = clientRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Client" + "id" + id));
+            
             Client client = clientMapper.toEntity(requestDto);
             client.setId(id);
+            
+            // Check if email is changed and if new email exists
+            if (!existingClient.getEmail().equals(client.getEmail()) 
+                && clientRepository.findByEmail(client.getEmail()).isPresent()) {
+                throw new DuplicateResourceException("Client with email " + client.getEmail() + " already exists");
+            }
+            
+            // Check if phone is changed and if new phone exists
+            if (!existingClient.getPhone().equals(client.getPhone()) 
+                && clientRepository.findByPhone(client.getPhone()).isPresent()) {
+                throw new DuplicateResourceException("Client with phone " + client.getPhone() + " already exists");
+            }
+            
             validateClient(client);
+            Client updatedClient = clientRepository.save(client);
+            return clientMapper.toResponseDto(updatedClient);
+        } catch (ResourceNotFoundException | DuplicateResourceException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Error while updating client", e);
+            throw new ServiceException("Error while updating client", e);
+        }
+    }
+
+    @Transactional
+    public ClientResponseDto updateProfilePicture(Long id, String profilePictureUrl) {
+        log.debug("Updating profile picture for client with id: {}", id);
+        try {
+            Client client = clientRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Client" + "id" + id));
+            
+            client.setProfilePictureUrl(profilePictureUrl);
             Client updatedClient = clientRepository.save(client);
             return clientMapper.toResponseDto(updatedClient);
         } catch (ResourceNotFoundException e) {
             throw e;
         } catch (Exception e) {
-            log.error("Error while updating client", e);
-            throw new ServiceException("Error while updating client", e);
+            log.error("Error while updating client profile picture", e);
+            throw new ServiceException("Error while updating client profile picture", e);
         }
     }
 
@@ -127,6 +203,9 @@ public class ClientService {
     private void validateNewClient(Client client) {
         if (clientRepository.findByEmail(client.getEmail()).isPresent()) {
             throw new DuplicateResourceException("Client with email " + client.getEmail() + " already exists");
+        }
+        if (clientRepository.findByPhone(client.getPhone()).isPresent()) {
+            throw new DuplicateResourceException("Client with phone " + client.getPhone() + " already exists");
         }
         validateClient(client);
     }
@@ -160,8 +239,32 @@ public class ClientService {
         if (!StringUtils.hasText(client.getEmail())) {
             throw new IllegalArgumentException("Client email is required");
         }
-        if (client.getDateOfBirth() != null && client.getDateOfBirth().isAfter(LocalDate.now())) {
-            throw new IllegalArgumentException("Date of birth cannot be in the future");
+        if (!StringUtils.hasText(client.getPhone())) {
+            throw new IllegalArgumentException("Client phone is required");
+        }
+        // Add phone number format validation
+        if (!client.getPhone().matches("^[2459]\\d{7}$")) {
+            throw new IllegalArgumentException("Invalid phone number format. Must be Tunisian format: 2/4/5/9XXXXXXX (8 digits)");
+        }
+
+        if (client.getDateOfBirth() != null) {
+            LocalDate now = LocalDate.now();
+            
+            if (client.getDateOfBirth().isAfter(now)) {
+                throw new IllegalArgumentException("Date of birth cannot be in the future");
+            }
+            
+            // Optional: Add minimum age validation
+            if (client.getDateOfBirth().plusYears(18).isAfter(now)) {
+                throw new IllegalArgumentException("Client must be at least 18 years old");
+            }
+        }
+        
+        // Add profile picture URL validation if needed
+        if (client.getProfilePictureUrl() != null && !client.getProfilePictureUrl().isEmpty()) {
+            if (!client.getProfilePictureUrl().matches("^(http|https)://.*$")) {
+                throw new IllegalArgumentException("Profile picture URL must be a valid HTTP/HTTPS URL");
+            }
         }
     }
 }

@@ -1,10 +1,45 @@
-import { ApiResponse, Client, ClientFilters, PaginatedResponse } from "../types";
+import { ApiResponse, Client, ClientFilters } from "../types";
 import { api } from "./api.service";
 
 class ClientService {
     private readonly endpoint = '/clients';
+    private readonly uploadEndpoint = '/api/upload';
 
-    async getAllClients(filters?: ClientFilters): Promise<ApiResponse<PaginatedResponse<Client>>> {
+    async uploadFile(file: File): Promise<string> {
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await api.post(this.uploadEndpoint, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
+
+            return response.data.url;
+        } catch (error) {
+            throw this.handleError(error);
+        }
+    }
+
+    async uploadProfilePicture(file: File): Promise<string> {
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await api.post(`${this.uploadEndpoint}/profile-picture`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
+
+            return response.data.url;
+        } catch (error) {
+            throw this.handleError(error);
+        }
+    }
+
+    async getAllClients(filters?: ClientFilters): Promise<ApiResponse<Client[]>> {
         try {
             const queryParams = {
                 name: filters?.name,
@@ -19,31 +54,35 @@ class ClientService {
                 sortDirection: filters?.sortDirection ?? 'asc'
             };
 
-            const response = await api.get<ApiResponse<PaginatedResponse<Client>>>(this.endpoint, {
+            const response = await api.get<ApiResponse<Client[]>>(this.endpoint, {
                 params: this.cleanParams(queryParams)
             });
 
-            // Transform backend response to match frontend expectations
-            return {
-                data: {
-                    content: response.data?.data?.content || [],
-                    totalElements: response.data?.data?.totalElements || 0,
-                    totalPages: response.data?.data?.totalPages || 0,
-                    size: response.data?.data?.size || queryParams.size,
-                    number: response.data?.data?.number || queryParams.page
-                },
-                message: response.data?.message,
-                status: response.status
-            };
+            return response.data;
         } catch (error) {
             throw this.handleError(error);
         }
     }
 
-    async createClient(client: Client): Promise<ApiResponse<Client>> {
+    async createClient(client: Client, profilePicture?: File): Promise<ApiResponse<Client>> {
         try {
-            const response = await api.post(this.endpoint, client);
-            return response;
+            const formData = new FormData();
+            const clientData = { ...client };
+            
+            // If there's a profile picture, upload it
+            if (profilePicture) {
+                formData.append('profilePicture', profilePicture);
+            }
+            
+            // Add client data as JSON string
+            formData.append('data', new Blob([JSON.stringify(clientData)], { type: 'application/json' }));
+
+            const response = await api.post<ApiResponse<Client>>(this.endpoint, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
+            return response.data;
         } catch (error) {
             throw this.handleError(error);
         }
@@ -51,8 +90,23 @@ class ClientService {
 
     async updateClient(id: number, client: Client): Promise<ApiResponse<Client>> {
         try {
-            const response = await api.put(`${this.endpoint}/${id}`, client);
-            return response;
+            const response = await api.put<ApiResponse<Client>>(`${this.endpoint}/${id}`, client);
+            return response.data;
+        } catch (error) {
+            throw this.handleError(error);
+        }
+    }
+
+    async updateClientProfilePicture(clientId: number, profilePictureUrl: string): Promise<ApiResponse<Client>> {
+        try {
+            const response = await api.patch<ApiResponse<Client>>(
+                `${this.endpoint}/${clientId}/profile-picture`,
+                null,
+                {
+                    params: { profilePictureUrl }
+                }
+            );
+            return response.data;
         } catch (error) {
             throw this.handleError(error);
         }
@@ -69,7 +123,7 @@ class ClientService {
     async searchClients(
         query: string,
         filters?: Omit<ClientFilters, 'name'>
-    ): Promise<ApiResponse<PaginatedResponse<Client>>> {
+    ): Promise<ApiResponse<Client>> {
         try {
             const queryParams = {
                 query,
@@ -81,10 +135,10 @@ class ClientService {
                 sortDirection: filters?.sortDirection ?? 'asc'
             };
 
-            const response = await api.get(`${this.endpoint}/search`, {
+            const response = await api.get<ApiResponse<Client>>(`${this.endpoint}/search`, {
                 params: this.cleanParams(queryParams)
             });
-            return response;
+            return response.data;
         } catch (error) {
             throw this.handleError(error);
         }
@@ -92,10 +146,10 @@ class ClientService {
 
     async getClientsByAgeRange(minAge: number, maxAge: number): Promise<ApiResponse<Client[]>> {
         try {
-            const response = await api.get(`${this.endpoint}/by-age-range`, {
+            const response = await api.get<ApiResponse<Client[]>>(`${this.endpoint}/by-age-range`, {
                 params: { minAge, maxAge }
             });
-            return response;
+            return response.data;
         } catch (error) {
             throw this.handleError(error);
         }
@@ -103,8 +157,8 @@ class ClientService {
 
     async getClientsOlderThan(age: number): Promise<ApiResponse<Client[]>> {
         try {
-            const response = await api.get(`${this.endpoint}/older-than/${age}`);
-            return response;
+            const response = await api.get<ApiResponse<Client[]>>(`${this.endpoint}/older-than/${age}`);
+            return response.data;
         } catch (error) {
             throw this.handleError(error);
         }
@@ -112,8 +166,8 @@ class ClientService {
 
     async getClientsYoungerThan(age: number): Promise<ApiResponse<Client[]>> {
         try {
-            const response = await api.get(`${this.endpoint}/younger-than/${age}`);
-            return response;
+            const response = await api.get<ApiResponse<Client[]>>(`${this.endpoint}/younger-than/${age}`);
+            return response.data;
         } catch (error) {
             throw this.handleError(error);
         }
@@ -121,12 +175,13 @@ class ClientService {
 
     async getClientsByRegion(region: string): Promise<ApiResponse<Client[]>> {
         try {
-            const response = await api.get(`${this.endpoint}/by-region/${region}`);
-            return response;
+            const response = await api.get<ApiResponse<Client[]>>(`${this.endpoint}/by-region/${region}`);
+            return response.data;
         } catch (error) {
             throw this.handleError(error);
         }
     }
+
 
     private cleanParams(params: Record<string, any>): Record<string, any> {
         const cleanedParams = Object.entries(params).reduce((acc, [key, value]) => {

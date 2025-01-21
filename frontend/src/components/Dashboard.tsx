@@ -20,7 +20,7 @@ export default function Dashboard() {
       const accountsResponse = await AccountService.getAllAccounts();
 
       if (clientsResponse.data) {
-        setTotalClients(clientsResponse.data.totalElements); // Use totalElements instead of length
+        setTotalClients(clientsResponse.pageMetadata.totalElements);
       }
       
       if (accountsResponse.data) {

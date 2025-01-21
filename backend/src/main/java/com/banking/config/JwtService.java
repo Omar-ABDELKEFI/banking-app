@@ -26,12 +26,19 @@ public class JwtService {
     }
 
     public String generateToken(Map<String, Object> extraClaims, UserDetails userDetails) {
+        Map<String, Object> claims = new HashMap<>(extraClaims);
+        claims.put("authorities", userDetails.getAuthorities());
+        claims.put("enabled", userDetails.isEnabled());
+        claims.put("accountNonExpired", userDetails.isAccountNonExpired());
+        claims.put("accountNonLocked", userDetails.isAccountNonLocked());
+        claims.put("credentialsNonExpired", userDetails.isCredentialsNonExpired());
+
         return Jwts
             .builder()
-            .setClaims(extraClaims)
+            .setClaims(claims)
             .setSubject(userDetails.getUsername())
             .setIssuedAt(new Date(System.currentTimeMillis()))
-            .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 24))
+            .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 24)) // 24 hours
             .signWith(getSignInKey(), SignatureAlgorithm.HS256)
             .compact();
     }

@@ -37,22 +37,22 @@ public final class ClientSpecifications {
 
     public static Specification<Client> withCity(String city) {
         return (root, query, cb) -> {
-            if (city == null) return null;
-            return cb.equal(root.get("city"), city);
+            if (city == null || city.trim().isEmpty()) return null;
+            return cb.like(cb.lower(root.get("city")), "%" + city.toLowerCase() + "%");
         };
     }
 
     public static Specification<Client> withRegion(String region) {
         return (root, query, cb) -> {
-            if (region == null) return null;
-            return cb.equal(root.get("region"), region);
+            if (region == null || region.trim().isEmpty()) return null;
+            return cb.like(cb.lower(root.get("region")), "%" + region.toLowerCase() + "%");
         };
     }
 
     public static Specification<Client> withRegionCode(String regionCode) {
         return (root, query, cb) -> {
-            if (regionCode == null) return null;
-            return cb.equal(root.get("regionCode"), regionCode);
+            if (regionCode == null || regionCode.trim().isEmpty()) return null;
+            return cb.like(cb.lower(root.get("regionCode")), "%" + regionCode.toLowerCase() + "%");
         };
     }
 

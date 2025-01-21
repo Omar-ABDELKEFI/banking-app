@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, CssBaseline } from '@mui/material';
+import { LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import DashboardPage from './pages/DashboardPage';
 import ClientsPage from './pages/ClientsPage';
 import AccountsPage from './pages/AccountsPage';
@@ -8,6 +10,7 @@ import RegisterForm from './components/RegisterForm';
 import Layout from './components/Layout';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { theme } from './theme';
+import CreateClient from './pages/clients/CreateClient';
 
 const PrivateRoute = ({ children }: { children: JSX.Element }) => {
   const { isAuthenticated } = useAuth();
@@ -40,6 +43,13 @@ function AppRoutes() {
           </Layout>
         </PrivateRoute>
       } />
+      <Route path="/clients/new" element={
+        <PrivateRoute>
+          <Layout>
+            <CreateClient />
+          </Layout>
+        </PrivateRoute>
+      } />
     </Routes>
   );
 }
@@ -47,12 +57,14 @@ function AppRoutes() {
 function App() {
   return (
     <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <BrowserRouter>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
-      </BrowserRouter>
+      <LocalizationProvider dateAdapter={AdapterDateFns}>
+        <CssBaseline />
+        <BrowserRouter>
+          <AuthProvider>
+            <AppRoutes />
+          </AuthProvider>
+        </BrowserRouter>
+      </LocalizationProvider>
     </ThemeProvider>
   );
 }

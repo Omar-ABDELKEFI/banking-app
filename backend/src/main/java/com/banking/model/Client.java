@@ -27,7 +27,11 @@ public class Client {
     private Long id;
     private String name;
     private String surname;
+    
+    @Column(unique = true)
     private String email;
+    
+    @Column(unique = true)
     private String phone;
     
     // Address fields
@@ -44,12 +48,18 @@ public class Client {
     // Region information
     private String region;
     private String regionCode;
+
+    private String profilePictureUrl;
+
     
     @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;
     
     @OneToMany(mappedBy = "client", cascade = CascadeType.ALL)
     private List<Account> accounts;
+
+    
+ 
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

@@ -11,10 +11,13 @@ export interface Client {
     country?: string;
     region?: string;
     regionCode?: string;
-    dateOfBirth?: string;
+    dateOfBirth?: Date | null;
     accounts?: Account[];
-    createdAt?: string;
-    updatedAt?: string;
+    createdAt?: Date;
+    updatedAt?: Date;
+    latitude?: number | null;
+    longitude?: number | null;
+    profilePictureUrl?: string;
 }
 
 export interface Account {
@@ -24,10 +27,18 @@ export interface Account {
 }
 
 export interface ApiResponse<T> {
-    data?: T;
-    message?: string;
-    status?: number;
-    error?: string;
+    data: T;
+    message: string;
+    pageMetadata: PageMetadata;
+    success: boolean;
+    timestamp: string;
+}
+
+export interface PageMetadata {
+    pageNumber: number;
+    pageSize: number;
+    totalElements: number;
+    totalPages: number;
 }
 
 export interface ClientFilters {
@@ -41,12 +52,4 @@ export interface ClientFilters {
     sortDirection?: 'asc' | 'desc';
     page?: number;
     size?: number;
-}
-
-export interface PaginatedResponse<T> {
-    content: T[];
-    totalElements: number;
-    totalPages: number;
-    size: number;
-    number: number;
 }

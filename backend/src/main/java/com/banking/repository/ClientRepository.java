@@ -30,4 +30,5 @@ public interface ClientRepository extends JpaRepository<Client, Long>, JpaSpecif
     Optional<Client> findDeletedById(@Param("id") Long id);
 
     Optional<Client> findByEmail(String email);
+    Optional<Client> findByPhone(String phone);
 }

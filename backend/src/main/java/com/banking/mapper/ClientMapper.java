@@ -5,14 +5,12 @@ import com.banking.dto.ClientResponseDto;
 import com.banking.model.Client;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.ReportingPolicy;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface ClientMapper {
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "createdAt", ignore = true)
-    @Mapping(target = "updatedAt", ignore = true)
-    @Mapping(target = "deletedAt", ignore = true)
     Client toEntity(ClientRequestDto dto);
-
-    ClientResponseDto toResponseDto(Client client);
+    
+    ClientResponseDto toResponseDto(Client entity);
 }

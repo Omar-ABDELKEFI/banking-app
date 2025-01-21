@@ -28,4 +28,5 @@ public class ClientResponseDto {
     private List<AccountResponseDto> accounts;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private String profilePictureUrl;
 }

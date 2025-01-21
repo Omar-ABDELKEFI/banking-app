@@ -4,9 +4,11 @@ import lombok.Data;
 import lombok.Builder;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.persistence.Transient;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Past;
+import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDate;
 
 @Data
@@ -22,7 +24,7 @@ public class ClientRequestDto {
     @Email(message = "Invalid email format")
     private String email;
 
-    @Pattern(regexp = "^\\+?[1-9][0-9]{7,14}$", message = "Invalid phone number")
+    @Pattern(regexp = "^[2459]\\d{7}$", message = "Invalid Tunisian phone number (should start with 2, 4, 5, or 9 and have 8 digits)")
     private String phone;
 
     private String streetAddress;
@@ -34,7 +36,11 @@ public class ClientRequestDto {
     private Double longitude;
     private String region;
     private String regionCode;
+    private String profilePictureUrl;
 
     @Past(message = "Date of birth must be in the past")
     private LocalDate dateOfBirth;
+
+
+
 }

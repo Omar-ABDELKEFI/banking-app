@@ -6,14 +6,17 @@ import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.http.MediaType;
 
 import java.util.List;
 
 @Tag(name = "Client", description = "Client management APIs")
 @RestController
 @RequestMapping("/api/clients")
+@Slf4j
 public class ClientController {
     private final ClientService clientService;
 
@@ -33,10 +36,15 @@ public class ClientController {
         return ResponseWrapper.success(clientService.findById(id));
     }
 
-    @Operation(summary = "Create a new client")
-    @PostMapping
+    @Operation(summary = "Create a new client with profile picture")
+    @PostMapping(consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
     @ResponseStatus(HttpStatus.CREATED)
-    public ResponseWrapper<ClientResponseDto> createClient(@Valid @RequestBody ClientRequestDto requestDto) {
+    public ResponseWrapper<ClientResponseDto> createClient(
+            @RequestPart("data") @Valid ClientRequestDto requestDto,
+            @RequestPart(value = "profilePicture", required = false) MultipartFile profilePicture) {
+        
+       
+        
         return ResponseWrapper.success(clientService.save(requestDto));
     }
 
@@ -46,6 +54,14 @@ public class ClientController {
             @PathVariable Long id,
             @Valid @RequestBody ClientRequestDto requestDto) {
         return ResponseWrapper.success(clientService.update(id, requestDto));
+    }
+
+    @Operation(summary = "Update client profile picture")
+    @PatchMapping("/{id}/profile-picture")
+    public ResponseWrapper<ClientResponseDto> updateProfilePicture(
+            @PathVariable Long id,
+            @RequestParam String profilePictureUrl) {
+        return ResponseWrapper.success(clientService.updateProfilePicture(id, profilePictureUrl));
     }
 
     @Operation(summary = "Delete a client")
