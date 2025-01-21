@@ -11,6 +11,8 @@ import Layout from './components/Layout';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { theme } from './theme';
 import CreateClient from './pages/clients/CreateClient';
+import EditClientPage from './pages/EditClientPage';
+import ClientPreviewUpdate from './pages/clients/ClientPreviewUpdate';
 
 const PrivateRoute = ({ children }: { children: JSX.Element }) => {
   const { isAuthenticated } = useAuth();
@@ -49,6 +51,24 @@ function AppRoutes() {
             <CreateClient />
           </Layout>
         </PrivateRoute>
+      } />
+      <Route path="/clients/edit/:id" element={
+        <PrivateRoute>
+          <Layout>
+            <EditClientPage />
+          </Layout>
+        </PrivateRoute>
+      } />
+      <Route path="/clients/preview-update" element={
+        <PrivateRoute>
+          <Layout>
+            <ClientPreviewUpdate />
+          </Layout>
+        </PrivateRoute>
+      } />
+      {/* Catch-all route for not found paths - must be the last route */}
+      <Route path="*" element={
+        <Navigate to="/" replace />
       } />
     </Routes>
   );

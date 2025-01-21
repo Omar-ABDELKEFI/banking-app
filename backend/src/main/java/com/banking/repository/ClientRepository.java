@@ -29,6 +29,12 @@ public interface ClientRepository extends JpaRepository<Client, Long>, JpaSpecif
     @Query("SELECT c FROM Client c WHERE c.id = :id AND c.deletedAt IS NOT NULL")
     Optional<Client> findDeletedById(@Param("id") Long id);
 
-    Optional<Client> findByEmail(String email);
-    Optional<Client> findByPhone(String phone);
+    @Query("SELECT c FROM Client c WHERE c.email = :email AND c.deletedAt IS NULL")
+    Optional<Client> findByEmail(@Param("email") String email);
+
+    @Query("SELECT c FROM Client c WHERE c.phone = :phone AND c.deletedAt IS NULL")
+    Optional<Client> findByPhone(@Param("phone") String phone);
+
+    @Query("SELECT EXISTS (SELECT 1 FROM Client c WHERE c.email = :email AND c.id != :clientId AND c.deletedAt IS NULL)")
+    boolean existsByEmailAndIdNot(@Param("email") String email, @Param("clientId") Long clientId);
 }

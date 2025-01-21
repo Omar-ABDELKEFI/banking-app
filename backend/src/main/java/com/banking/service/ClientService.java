@@ -25,6 +25,8 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Optional;
+import java.util.Map;
 
 @Service
 @Transactional
@@ -140,28 +142,102 @@ public class ClientService {
             Client existingClient = clientRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Client" + "id" + id));
             
-            Client client = clientMapper.toEntity(requestDto);
-            client.setId(id);
-            
-            // Check if email is changed and if new email exists
-            if (!existingClient.getEmail().equals(client.getEmail()) 
-                && clientRepository.findByEmail(client.getEmail()).isPresent()) {
-                throw new DuplicateResourceException("Client with email " + client.getEmail() + " already exists");
+            // Only check for duplicate email if email is changed
+            if (!existingClient.getEmail().equals(requestDto.getEmail())) {
+                boolean emailExists = clientRepository.existsByEmailAndIdNot(requestDto.getEmail(), id);
+                if (emailExists) {
+                    throw new DuplicateResourceException("Client with email " + requestDto.getEmail() + " already exists");
+                }
             }
             
-            // Check if phone is changed and if new phone exists
-            if (!existingClient.getPhone().equals(client.getPhone()) 
-                && clientRepository.findByPhone(client.getPhone()).isPresent()) {
-                throw new DuplicateResourceException("Client with phone " + client.getPhone() + " already exists");
+            // Only check for duplicate phone if phone is changed
+            if (!existingClient.getPhone().equals(requestDto.getPhone())) {
+                Optional<Client> clientWithPhone = clientRepository.findByPhone(requestDto.getPhone());
+                if (clientWithPhone.isPresent() && !clientWithPhone.get().getId().equals(id)) {
+                    throw new DuplicateResourceException("Client with phone " + requestDto.getPhone() + " already exists");
+                }
             }
+
+            // Map the request DTO to entity while preserving the existing data
+            Client updatedClient = clientMapper.toEntity(requestDto);
+            updatedClient.setId(id);
             
-            validateClient(client);
-            Client updatedClient = clientRepository.save(client);
-            return clientMapper.toResponseDto(updatedClient);
+            // Preserve existing data that shouldn't be updated
+            updatedClient.setProfilePictureUrl(existingClient.getProfilePictureUrl());
+            updatedClient.setCreatedAt(existingClient.getCreatedAt());
+            
+            validateClient(updatedClient);
+            Client savedClient = clientRepository.save(updatedClient);
+            return clientMapper.toResponseDto(savedClient);
         } catch (ResourceNotFoundException | DuplicateResourceException e) {
             throw e;
         } catch (Exception e) {
             log.error("Error while updating client", e);
+            throw new ServiceException("Error while updating client", e);
+        }
+    }
+
+    @Transactional
+    public ClientResponseDto partialUpdate(Long id, Map<String, Object> updates) {
+        log.debug("Partially updating client with id: {} with updates: {}", id, updates);
+        try {
+            Client existingClient = clientRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Client" + "id" + id));
+
+            // Only check email if it's being updated
+            if (updates.containsKey("email")) {
+                String newEmail = (String) updates.get("email");
+                if (!existingClient.getEmail().equals(newEmail)) {
+                    boolean emailExists = clientRepository.existsByEmailAndIdNot(newEmail, id);
+                    if (emailExists) {
+                        throw new DuplicateResourceException("Client with email " + newEmail + " already exists");
+                    }
+                }
+            }
+
+            // Only check phone if it's being updated
+            if (updates.containsKey("phone")) {
+                String newPhone = (String) updates.get("phone");
+                if (!existingClient.getPhone().equals(newPhone)) {
+                    Optional<Client> clientWithPhone = clientRepository.findByPhone(newPhone);
+                    if (clientWithPhone.isPresent() && !clientWithPhone.get().getId().equals(id)) {
+                        throw new DuplicateResourceException("Client with phone " + newPhone + " already exists");
+                    }
+                }
+            }
+
+            // Apply only the changed fields
+            updates.forEach((key, value) -> {
+                try {
+                    if (value != null) {
+                        switch (key) {
+                            case "name" -> existingClient.setName((String) value);
+                            case "surname" -> existingClient.setSurname((String) value);
+                            case "email" -> existingClient.setEmail((String) value);
+                            case "phone" -> existingClient.setPhone((String) value);
+                            case "streetAddress" -> existingClient.setStreetAddress((String) value);
+                            case "city" -> existingClient.setCity((String) value);
+                            case "state" -> existingClient.setState((String) value);
+                            case "postalCode" -> existingClient.setPostalCode((String) value);
+                            case "country" -> existingClient.setCountry((String) value);
+                            case "region" -> existingClient.setRegion((String) value);
+                            case "regionCode" -> existingClient.setRegionCode((String) value);
+                            case "dateOfBirth" -> existingClient.setDateOfBirth(LocalDate.parse((String) value));
+                            case "latitude" -> existingClient.setLatitude((Double) value);
+                            case "longitude" -> existingClient.setLongitude((Double) value);
+                        }
+                    }
+                } catch (Exception e) {
+                    log.error("Error updating field: " + key, e);
+                    throw new IllegalArgumentException("Invalid value for field: " + key);
+                }
+            });
+
+            validateClient(existingClient);
+            Client savedClient = clientRepository.save(existingClient);
+            return clientMapper.toResponseDto(savedClient);
+        } catch (Exception e) {
+            log.error("Error while partially updating client", e);
             throw new ServiceException("Error while updating client", e);
         }
     }

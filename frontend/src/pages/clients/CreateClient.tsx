@@ -58,6 +58,7 @@ const CreateClient: React.FC = () => {
             onSubmit={handleSubmit}
             onCancel={handleCancel}
             isLoading={isLoading}
+            mode="create" // Add this line
           />
         </Paper>
 

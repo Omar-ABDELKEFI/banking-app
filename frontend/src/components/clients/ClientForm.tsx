@@ -15,7 +15,7 @@ import {
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { Client } from '../../types';
+import { Client, FieldChange } from '../../types'; // Add FieldChange import
 import { PhotoCamera, Delete } from '@mui/icons-material';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -27,6 +27,8 @@ interface ClientFormProps {
   onSubmit: (data: Partial<Client>) => void;
   onCancel: () => void;
   isLoading?: boolean;
+  mode: 'create' | 'edit'; // Add this line
+  onFieldChange?: (changes: FieldChange[]) => void;
 }
 
 interface ValidationErrors {
@@ -41,8 +43,15 @@ const ClientForm: React.FC<ClientFormProps> = ({
   initialData = {},
   onSubmit,
   onCancel,
-  isLoading = false
+  isLoading = false,
+  mode, // Add this line
+  onFieldChange
 }) => {
+  // Convert dateOfBirth string to Date object if it exists
+  const initialDateOfBirth = initialData.dateOfBirth 
+    ? new Date(initialData.dateOfBirth) 
+    : null;
+
   const [formData, setFormData] = React.useState<Partial<Client>>({
     name: '',
     surname: '',
@@ -55,8 +64,8 @@ const ClientForm: React.FC<ClientFormProps> = ({
     country: '',
     region: '',
     regionCode: '',
-    dateOfBirth: null,
-    ...initialData
+    dateOfBirth: initialDateOfBirth,
+    ...initialData,
   });
   
   const [errors, setErrors] = useState<ValidationErrors>({});
@@ -67,10 +76,42 @@ const ClientForm: React.FC<ClientFormProps> = ({
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [uploadError, setUploadError] = useState<string>('');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [changedFields, setChangedFields] = useState<FieldChange[]>([]);
+  const [originalData] = useState(initialData); // Store initial data for comparison
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    const oldValue = originalData[name as keyof Client];
+    
     setFormData(prev => ({ ...prev, [name]: value }));
+    
+    if (value !== oldValue) {
+      updateChangedFields(name as keyof Client, oldValue, value);
+    }
+  };
+
+  const updateChangedFields = (field: keyof Client, oldValue: any, newValue: any) => {
+    const existingChangeIndex = changedFields.findIndex(change => change.field === field);
+    
+    if (existingChangeIndex >= 0) {
+      // If value is back to original, remove the change
+      if (newValue === originalData[field]) {
+        const newChanges = changedFields.filter((_, index) => index !== existingChangeIndex);
+        setChangedFields(newChanges);
+        onFieldChange?.(newChanges);
+      } else {
+        // Update existing change
+        const newChanges = [...changedFields];
+        newChanges[existingChangeIndex] = { field, oldValue, newValue };
+        setChangedFields(newChanges);
+        onFieldChange?.(newChanges);
+      }
+    } else {
+      // Add new change
+      const newChanges = [...changedFields, { field, oldValue, newValue }];
+      setChangedFields(newChanges);
+      onFieldChange?.(newChanges);
+    }
   };
 
   const handleDateChange = (date: Date | null) => {
@@ -89,7 +130,17 @@ const ClientForm: React.FC<ClientFormProps> = ({
         return;
       }
     }
-    setFormData(prev => ({ ...prev, dateOfBirth: date }));
+    
+    // Ensure we're working with a valid Date object
+    const validDate = date ? new Date(date) : null;
+    setFormData(prev => ({ ...prev, dateOfBirth: validDate }));
+    
+    // Track date change
+    updateChangedFields(
+      'dateOfBirth',
+      originalData.dateOfBirth,
+      validDate
+    );
   };
 
   const handleProfilePictureUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -195,12 +246,22 @@ const ClientForm: React.FC<ClientFormProps> = ({
         // If there's a file to upload, upload it first
         let profilePictureUrl = formData.profilePictureUrl;
       
-
-        // Submit the form with the uploaded file URL
-        await onSubmit({
-            ...formData,
-            profilePictureUrl
-        });
+        // In edit mode, only send changed fields
+        if (mode === 'edit') {
+          const changedData = changedFields.reduce((acc, change) => {
+            acc[change.field as keyof Client] = change.newValue;
+            return acc;
+          }, {} as Partial<Client>);
+          
+          // Always include ID in edit mode
+          if ('id' in initialData) {
+            changedData.id = initialData.id;
+          }
+          
+          await onSubmit(changedData);
+        } else {
+          await onSubmit(formData);
+        }
       } catch (error) {
         console.error('Error during form submission:', error);
         setUploadError('Failed to process the form. Please try again.');
@@ -334,7 +395,7 @@ const ClientForm: React.FC<ClientFormProps> = ({
               <LocalizationProvider dateAdapter={AdapterDateFns}>
                 <DatePicker
                   label="Date of Birth"
-                  value={formData.dateOfBirth}
+                  value={formData.dateOfBirth ? new Date(formData.dateOfBirth) : null}
                   onChange={handleDateChange}
                   slotProps={{ 
                     textField: { 
@@ -461,7 +522,7 @@ const ClientForm: React.FC<ClientFormProps> = ({
           variant="contained"
           disabled={isLoading}
         >
-          {isLoading ? 'Saving...' : 'Save Client'}
+          {isLoading ? 'Saving...' : mode === 'create' ? 'Create Client' : 'Update Client'}
         </Button>
       </Box>
     </form>

@@ -2,7 +2,7 @@ import { ApiResponse, Client, ClientFilters } from "../types";
 import { api } from "./api.service";
 
 class ClientService {
-    private readonly endpoint = '/clients';
+    private readonly endpoint = 'clients';
     private readonly uploadEndpoint = '/api/upload';
 
     async uploadFile(file: File): Promise<string> {
@@ -88,9 +88,10 @@ class ClientService {
         }
     }
 
-    async updateClient(id: number, client: Client): Promise<ApiResponse<Client>> {
+    async updateClient(id: number, updatedFields: Partial<Client>): Promise<ApiResponse<Client>> {
         try {
-            const response = await api.put<ApiResponse<Client>>(`${this.endpoint}/${id}`, client);
+            // Use PATCH instead of PUT for partial updates
+            const response = await api.patch<ApiResponse<Client>>(`${this.endpoint}/${id}`, updatedFields);
             return response.data;
         } catch (error) {
             throw this.handleError(error);

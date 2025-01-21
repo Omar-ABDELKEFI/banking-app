@@ -11,7 +11,7 @@ export interface Client {
     country?: string;
     region?: string;
     regionCode?: string;
-    dateOfBirth?: Date | null;
+    dateOfBirth: Date | null;
     accounts?: Account[];
     createdAt?: Date;
     updatedAt?: Date;
@@ -42,6 +42,7 @@ export interface PageMetadata {
 }
 
 export interface ClientFilters {
+    id?: number;
     name?: string;
     city?: string;
     region?: string;
@@ -52,4 +53,15 @@ export interface ClientFilters {
     sortDirection?: 'asc' | 'desc';
     page?: number;
     size?: number;
+}
+
+export interface FieldChange {
+  field: keyof Client;  // Make it type-safe by using keyof Client
+  oldValue: any;
+  newValue: any;
+}
+
+export interface EditStats {
+  totalChanges: number;
+  changes: FieldChange[];
 }

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Paper, Table, TableBody, TableCell, TableContainer, TableHead, 
   TableRow, Box, Card, CardContent, Chip, Typography, IconButton,
-  Tooltip, TablePagination, Fade, Skeleton, LinearProgress, Avatar, ButtonGroup, Button // Added missing imports
+  Tooltip, TablePagination, Fade, Skeleton, LinearProgress, Avatar, ButtonGroup, Button, Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText // Added missing imports
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
@@ -81,6 +81,8 @@ export default function ClientList() {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [debouncedFilters, setDebouncedFilters] = useState(filters);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const navigate = useNavigate();
 
   const calculateAge = (birthDate: Date): number => {
@@ -166,6 +168,33 @@ export default function ClientList() {
     setSelectedClient(client);
     setPreviewOpen(true);
   };
+
+  const handleEditClick = (e: React.MouseEvent, client: Client) => {
+    e.stopPropagation(); // Prevent row click
+    navigate(`/clients/edit/${client.id}`);
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent, client: Client) => {
+    e.stopPropagation(); // Prevent row click
+    setClientToDelete(client);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (clientToDelete?.id) {
+        try {
+            console.log('Attempting to delete client:', clientToDelete.id);
+            await ClientService.deleteClient(clientToDelete.id);
+            console.log('Client deleted successfully');
+            loadClients();
+            setDeleteDialogOpen(false);
+        } catch (error) {
+            console.error('Error deleting client:', error);
+            // Optional: Add error notification here
+            alert('Failed to delete client. Please try again.');
+        }
+    }
+};
 
   return (
     <Fade in={true} timeout={800}>
@@ -297,12 +326,18 @@ export default function ClientList() {
                     <TableCell align="right">
                       <ButtonGroup size="small">
                         <Tooltip title="Edit Client">
-                          <IconButton color="primary">
+                          <IconButton 
+                            color="primary"
+                            onClick={(e) => handleEditClick(e, client)}
+                          >
                             <EditIcon />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Delete Client">
-                          <IconButton color="error">
+                          <IconButton 
+                            color="error"
+                            onClick={(e) => handleDeleteClick(e, client)}
+                          >
                             <DeleteIcon />
                           </IconButton>
                         </Tooltip>
@@ -330,6 +365,24 @@ export default function ClientList() {
           open={previewOpen}
           onClose={() => setPreviewOpen(false)}
         />
+
+        <Dialog
+          open={deleteDialogOpen}
+          onClose={() => setDeleteDialogOpen(false)}
+        >
+          <DialogTitle>Confirm Delete</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Are you sure you want to delete client {clientToDelete?.name} {clientToDelete?.surname}? This action cannot be undone.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleDeleteConfirm} color="error" variant="contained">
+              Delete
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     </Fade>
   );

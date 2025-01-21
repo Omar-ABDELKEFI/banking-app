@@ -10,12 +10,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 
 import java.util.List;
+import java.util.Map;
 
 @Tag(name = "Client", description = "Client management APIs")
 @RestController
-@RequestMapping("/api/clients")
+@RequestMapping("/api/clients")  // Make sure this matches the frontend endpoint
 @Slf4j
 public class ClientController {
     private final ClientService clientService;
@@ -43,8 +45,6 @@ public class ClientController {
             @RequestPart("data") @Valid ClientRequestDto requestDto,
             @RequestPart(value = "profilePicture", required = false) MultipartFile profilePicture) {
         
-       
-        
         return ResponseWrapper.success(clientService.save(requestDto));
     }
 
@@ -54,6 +54,14 @@ public class ClientController {
             @PathVariable Long id,
             @Valid @RequestBody ClientRequestDto requestDto) {
         return ResponseWrapper.success(clientService.update(id, requestDto));
+    }
+
+    @Operation(summary = "Update a client partially")
+    @PatchMapping("/{id}")
+    public ResponseWrapper<ClientResponseDto> partialUpdateClient(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> updates) {
+        return ResponseWrapper.success(clientService.partialUpdate(id, updates));
     }
 
     @Operation(summary = "Update client profile picture")
@@ -67,11 +75,9 @@ public class ClientController {
     @Operation(summary = "Delete a client")
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public ResponseWrapper<List<Object>> deleteClient(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteClient(@PathVariable Long id) {
         clientService.deleteById(id);
-        return ResponseWrapper.success(null);
+        return ResponseEntity.noContent().build();
     }
-
-  
 
 }
